@@ -1,61 +1,76 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
-import Webcam from 'react-webcam';
-import {load as cocoSSDLoad} from "@tensorflow-models/coco-ssd";
-import * as tf from '@tensorflow/tfjs';
+import React, { useEffect, useRef, useState } from "react";
+import Webcam from "react-webcam";
+import { load as cocoSSDLoad } from "@tensorflow-models/coco-ssd";
+import * as tf from "@tensorflow/tfjs";
+import { renderPredictions } from "@/utils/render-predictions";
 
-let detectInterval
+let detectInterval;
 
 const ObjectDetection = () => {
-    const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true);
 
-    const webcamRef = useRef(null);
+  const webcamRef = useRef(null);
+  const canvasRef = useRef(null);
 
-    const runCoco = async () => {
-        setIsLoading(true);
-        const net = await cocoSSDLoad();
-        setIsLoading(false);
+  async function runCoco() {
+    setIsLoading(true); // Set loading state to true when model loading starts
+    const net = await cocoSSDLoad();
+    setIsLoading(false); // Set loading state to false when model loading completes
 
-        detectInterval = setInterval(() => {
-           // runObjectDetection(net)
-        },10)
-    };
+    detectInterval = setInterval(() => {
+      runObjectDetection(net); // will build this next
+    }, 10);
+  }
 
-    const showmyVideo = () => {
-        if (
-            webcamRef.current !== null &&
-            webcamRef.current.video?.readyState === 4
-        ) {
-            const myVideoWidth = webcamRef.current.video.myVideoWidth;
-            const myVideoHeight = webcamRef.current.video.myVideoHeight;
+  async function runObjectDetection(net) {
+    if (
+      canvasRef.current &&
+      webcamRef.current !== null &&
+      webcamRef.current.video?.readyState === 4
+    ) {
+      canvasRef.current.width = webcamRef.current.video.videoWidth;
+      canvasRef.current.height = webcamRef.current.video.videoHeight;
 
-            webcamRef.current.video.widht = myVideoWidth;
-            webcamRef.current.video.height = myVideoHeight;
-        }
-    };
+      // find detected objects
+      const detectedObjects = await net.detect(
+        webcamRef.current.video,
+        undefined,
+        0.6
+      );
 
-    useEffect(() => {
-        runCoco()
-        showmyVideo();
-    }, []);
+      const context = canvasRef.current.getContext("2d");
+      renderPredictions(detectedObjects, context);
+    }
+  }
 
-    return (
-        <div className='mt-8'>{
-            isLoading ? (
-                <div className='gradient-text'>Loading AI Model</div>
-            ):
-            <div className='relative flex justify-center items-center gradient p-1.5 rounded-md'>
-                {/* webcam */}
-                <Webcam
-                 ref={webcamRef}
-                 className='rounded-md w-full lg:h-[720px]'
-                 muted
-                />
-                {/* canvas */}
-            </div>}
+  useEffect(() => {
+    runCoco();
+  }, []);
+
+  return (
+    <div className="mt-8">
+      {isLoading ? (
+        <div className="gradient-text">Cargando recursos... </div>
+      ) : (
+        <div className="relative flex justify-center items-center gradient p-1.5 rounded-md">
+          <div className="relative w-full h-auto md:w-[720px] md:h-[480px] lg:w-[1080px] lg:h-[720px] xl:w-[1440px] xl:h-[960px]">
+            <Webcam
+              ref={webcamRef}
+              className="rounded-md w-full h-full"
+              muted
+            />
+            <canvas
+              ref={canvasRef}
+              className="absolute top-0 left-0 w-full h-full"
+              style={{ zIndex: 9999 }}
+            />
+          </div>
         </div>
-    )
-}; 
+      )}
+    </div>
+  );
+};
 
-export default ObjectDetection
+export default ObjectDetection;
